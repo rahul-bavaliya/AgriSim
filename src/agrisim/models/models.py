@@ -16,6 +16,7 @@ class FieldModel(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+
     boundary = mapped_column(
         Geometry(geometry_type="POLYGON", srid=4326), nullable=False
     )
