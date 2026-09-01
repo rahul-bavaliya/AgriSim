@@ -69,5 +69,25 @@ services:
       redis:
         condition: service_healthy
 
+  celery_beat:
+    build: .
+    working_dir: /app
+    container_name: agrisim_celery_beat
+    command: uv run celery -A agrisim.tasks.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app/src
+      - POSTGRES_SERVER=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:

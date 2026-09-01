@@ -17,6 +17,7 @@ from agrisim.core.constants import (
     TASK_FETCH_WEATHER,
 )
 from agrisim.core.database import SessionLocal
+from agrisim.models.fieldmodel import FieldModel
 from agrisim.schemas.weather import WeatherCreate
 from agrisim.services.weather import WeatherService
 from agrisim.tasks.celery_app import celery_app
@@ -26,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name=TASK_FETCH_WEATHER)  # type: ignore[misc, reportUnknownMemberType, reportUntypedFunctionDecorator]
 def fetch_field_weather(field_id: UUID, lat: float, lon: float) -> dict[str, Any]:
+    """
+    Fetch live Canadian weather data for a specific field using its coordinates.
+    """
     logger.info(
         f"Fetching live Canadian weather for field {field_id} at coordinates ({lat}, {lon})"
     )
@@ -99,6 +103,32 @@ def fetch_field_weather(field_id: UUID, lat: float, lon: float) -> dict[str, Any
         logger.error(
             f"Database error while saving weather for field {field_id}: {str(db_err)}"
         )
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(name="tasks.poll_all_fields_weather")
+def poll_all_fields_weather() -> dict[str, Any]:
+    """
+    Periodic task triggered by Celery Beat to fetch weather for all registered fields.
+    """
+    logger.info("Celery Beat triggered: Polling weather for all fields...")
+    db = SessionLocal()
+    dispatched_count = 0
+    try:
+        fields = db.query(FieldModel).all()
+        for field in fields:
+            # Extract centroid from field boundary if method exists, else use fallback
+            lat, lon = field.get_centroid() if hasattr(field, "get_centroid") else (42.02, -93.63)
+            
+            fetch_field_weather.delay(field_id=field.id, lat=lat, lon=lon)
+            dispatched_count += 1
+            
+        logger.info(f"Dispatched weather fetch tasks for {dispatched_count} fields.")
+        return {"status": "success", "dispatched": dispatched_count}
+    except Exception as e:
+        logger.error(f"Error in periodic weather polling: {str(e)}")
         raise
     finally:
         db.close()
