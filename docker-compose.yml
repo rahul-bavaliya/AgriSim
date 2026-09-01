@@ -1,17 +1,17 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:latest
     container_name: agrisim_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: agrisim
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d agrisim"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,51 +21,53 @@ services:
     container_name: agrisim_redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
     working_dir: /app
     container_name: agrisim_web
     command: uv run uvicorn agrisim.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/app 
-      - venv-volume:/app/.venv
-    ports:
-      - "8000:8000"
+    env_file:
+      - .env
     environment:
       - PYTHONPATH=/app/src
       - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=agrisim
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - /app/.venv    # <--- Prevents host/.venv from overriding container's .venv
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   celery_worker:
     build: .
     working_dir: /app
     container_name: agrisim_celery
     command: uv run celery -A agrisim.tasks.celery_app worker --loglevel=info
-    volumes:
-      - .:/app                  # <--- Fixed: map root so uv can read pyproject.toml
-      - venv-volume:/app/.venv
+    env_file:
+      - .env
     environment:
-      - PYTHONPATH=/app/src     # <--- Added: helps celery find the modules easily
+      - PYTHONPATH=/app/src
       - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=agrisim
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - /app/.venv    # <--- Prevents host/.venv from overriding container's .venv
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
-  pgdata:
-  venv-volume:            # <--- Added: declared here so docker compose stops complaining
+  postgres_data:
