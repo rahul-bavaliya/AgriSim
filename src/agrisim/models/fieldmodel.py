@@ -5,11 +5,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from geoalchemy2 import Geometry
 from agrisim.core.database import Base
+from sqlalchemy.orm import relationship
 
 
 class FieldModel(Base):
     __tablename__ = "fields"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -24,4 +25,9 @@ class FieldModel(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
+    )
+
+    # Add this inside your FieldModel class definition:
+    weather_records = relationship(
+        "WeatherModel", back_populates="field", cascade="all, delete-orphan"
     )
