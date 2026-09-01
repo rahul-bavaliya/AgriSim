@@ -10,7 +10,7 @@ from alembic import context
 
 from agrisim.core.config import settings
 from agrisim.core.database import Base
-from agrisim.models import FieldModel, WeatherTelemetryModel, SimulationModel
+from agrisim.models import FieldModel
 
 from geoalchemy2 import alembic_helpers
 from typing import Optional

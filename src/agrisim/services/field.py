@@ -38,3 +38,20 @@ def delete_field(db: Session, field_id: uuid.UUID) -> bool:
     db.delete(db_field)
     db.commit()
     return True
+
+def update_field(db: Session, field_id: uuid.UUID, field_in: dict) -> FieldModel | None:
+    db_field = get_field_by_id(db, field_id)
+    if not db_field:
+        return None
+    
+    # If boundary is being updated, convert it to a WKBElement
+    if "boundary" in field_in and field_in["boundary"] is not None:
+        geom = shape(field_in["boundary"])
+        field_in["boundary"] = from_shape(geom, srid=4326)
+
+    for key, value in field_in.items():
+        setattr(db_field, key, value)
+        
+    db.commit()
+    db.refresh(db_field)
+    return db_field

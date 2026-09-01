@@ -25,10 +25,11 @@ services:
 
   web:
     build: .
+    working_dir: /app
     container_name: agrisim_web
     command: uv run uvicorn agrisim.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - ./src:/app/src
+      - .:/app # <-- Maps the entire root folder, including tests/ and pyproject.toml
     ports:
       - "8000:8000"
     environment:

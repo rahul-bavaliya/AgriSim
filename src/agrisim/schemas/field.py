@@ -1,6 +1,8 @@
 import uuid
-from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+from geoalchemy2.shape import to_shape
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from shapely.geometry import mapping
 
 
 class FieldCreate(BaseModel):
@@ -26,11 +28,44 @@ class FieldCreate(BaseModel):
     )
 
 
+class FieldUpdate(BaseModel):
+    name: Optional[str] = Field(None, examples=["South Valley Farm"])
+    total_acres: Optional[float] = Field(None, examples=[125.0])
+    boundary: Optional[Dict[str, Any]] = Field(
+        None,
+        examples=[
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [-93.2, 44.9],
+                        [-93.1, 44.9],
+                        [-93.1, 44.8],
+                        [-93.2, 44.8],
+                        [-93.2, 44.9],
+                    ]
+                ],
+            }
+        ],
+    )
+
+
 class FieldResponse(BaseModel):
     id: uuid.UUID
     name: str
     owner_id: uuid.UUID
     total_acres: float
+    boundary: Dict[str, Any]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("boundary", mode="before")
+    @classmethod
+    def assemble_boundary(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return v
+        try:
+            shape = to_shape(v)
+            return mapping(shape)
+        except Exception:
+            return v
