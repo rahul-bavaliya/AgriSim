@@ -11,6 +11,7 @@ from agrisim.api.v1.endpoints import fields, weather
 from agrisim.schemas.envelope import ResponseEnvelope
 from agrisim.core.logging import setup_logging
 
+
 # --- Initialize Centralized Logging ---
 setup_logging()
 

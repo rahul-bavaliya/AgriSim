@@ -1,4 +1,4 @@
-from pydantic import computed_field
+from pydantic import ConfigDict, computed_field
 from pydantic_settings import BaseSettings
 
 
@@ -29,9 +29,7 @@ class Settings(BaseSettings):
 
     ECCC_BASE_URL: str = "https://api.weather.gc.ca/collections/swob-realtime/items"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = ConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
