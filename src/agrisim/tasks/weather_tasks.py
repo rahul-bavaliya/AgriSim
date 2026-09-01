@@ -20,6 +20,7 @@ from agrisim.core.database import SessionLocal
 from agrisim.models.fieldmodel import FieldModel
 from agrisim.schemas.weather import WeatherCreate
 from agrisim.services.weather import WeatherService
+from agrisim.services.soil import SoilSimulationService  # Added for Module 1
 from agrisim.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -93,10 +94,23 @@ def fetch_field_weather(field_id: UUID, lat: float, lon: float) -> dict[str, Any
         logger.info(
             f"Successfully ingested weather record ID: {weather_record.id} for field: {field_id}"
         )
+
+        # Update Soil Moisture & Water Balance using the newly ingested weather data
+        soil_state = SoilSimulationService.update_field_soil_moisture(
+            db=db,
+            field_id=field_id,
+            precipitation_mm=weather_record.precipitation_mm,
+            temperature_celsius=weather_record.temperature_celsius,
+        )
+        logger.info(
+            f"Updated soil moisture for field {field_id}: {soil_state.soil_moisture_mm:.2f} mm"
+        )
+
         return {
             "status": "success",
             "field_id": str(field_id),
             "weather_id": str(weather_record.id),
+            "soil_moisture_mm": soil_state.soil_moisture_mm,
         }
     except Exception as db_err:
         db.rollback()
@@ -120,11 +134,15 @@ def poll_all_fields_weather() -> dict[str, Any]:
         fields = db.query(FieldModel).all()
         for field in fields:
             # Extract centroid from field boundary if method exists, else use fallback
-            lat, lon = field.get_centroid() if hasattr(field, "get_centroid") else (42.02, -93.63)
-            
+            lat, lon = (
+                field.get_centroid()
+                if hasattr(field, "get_centroid")
+                else (42.02, -93.63)
+            )
+
             fetch_field_weather.delay(field_id=field.id, lat=lat, lon=lon)
             dispatched_count += 1
-            
+
         logger.info(f"Dispatched weather fetch tasks for {dispatched_count} fields.")
         return {"status": "success", "dispatched": dispatched_count}
     except Exception as e:

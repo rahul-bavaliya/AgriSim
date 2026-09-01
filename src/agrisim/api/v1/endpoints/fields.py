@@ -7,6 +7,8 @@ from agrisim.core.database import get_db
 from agrisim.schemas.field import FieldCreate, FieldResponse, FieldUpdate
 from agrisim.schemas.envelope import ResponseEnvelope
 from agrisim.services import field as field_service
+from uuid import UUID
+from agrisim.models.soil import SoilStateModel
 
 router = APIRouter(prefix="/fields", tags=["Fields"])
 
@@ -47,7 +49,9 @@ def read_field(field_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.delete(
     "/{field_id}", response_model=ResponseEnvelope[None], status_code=status.HTTP_200_OK
 )
-def remove_field(field_id: uuid.UUID, db: Session = Depends(get_db)) -> ResponseEnvelope[None]:
+def remove_field(
+    field_id: uuid.UUID, db: Session = Depends(get_db)
+) -> ResponseEnvelope[None]:
     success = field_service.delete_field(db=db, field_id=field_id)
     if not success:
         raise HTTPException(status_code=404, detail="Field not found")
@@ -55,16 +59,13 @@ def remove_field(field_id: uuid.UUID, db: Session = Depends(get_db)) -> Response
         status="success", code=200, message="Field deleted successfully", data=None
     )
 
+
 @router.put("/{field_id}", response_model=ResponseEnvelope[FieldResponse])
 def update_field(
-    field_id: uuid.UUID,
-    field_in: FieldUpdate,
-    db: Session = Depends(get_db)
+    field_id: uuid.UUID, field_in: FieldUpdate, db: Session = Depends(get_db)
 ) -> ResponseEnvelope[FieldResponse]:
     updated_field = field_service.update_field(
-        db=db, 
-        field_id=field_id, 
-        field_in=field_in.model_dump(exclude_unset=True)
+        db=db, field_id=field_id, field_in=field_in.model_dump(exclude_unset=True)
     )
     if not updated_field:
         raise HTTPException(status_code=404, detail="Field not found")
@@ -72,5 +73,21 @@ def update_field(
         status="success",
         code=200,
         message="Field updated successfully",
-        data=updated_field
+        data=updated_field,
     )
+
+
+@router.get("/fields/{field_id}/soil-state")
+def get_soil_state(field_id: UUID, db: Session = Depends(get_db)):
+    soil = db.query(SoilStateModel).filter(SoilStateModel.field_id == field_id).first()
+    if not soil:
+        raise HTTPException(
+            status_code=404, detail="Soil state not found for this field."
+        )
+    return {
+        "field_id": soil.field_id,
+        "soil_moisture_mm": soil.soil_moisture_mm,
+        "field_capacity_mm": soil.field_capacity_mm,
+        "wilting_point_mm": soil.wilting_point_mm,
+        "calculated_at": soil.calculated_at,
+    }

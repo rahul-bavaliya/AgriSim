@@ -7,10 +7,9 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
-from agrisim.api.v1.endpoints import fields, weather
+from agrisim.api.v1.endpoints import auth, fields, recommendations, weather
 from agrisim.schemas.envelope import ResponseEnvelope
 from agrisim.core.logging import setup_logging
-
 
 # --- Initialize Centralized Logging ---
 setup_logging()
@@ -60,3 +59,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # --- Register Routers ---
 app.include_router(fields.router, prefix="/api/v1")
 app.include_router(weather.router, prefix="/api/v1")
+app.include_router(
+    recommendations.router, prefix="/api/v1", tags=["ML Recommendations"]
+)
+app.include_router(auth.router, prefix="/api/v1")
