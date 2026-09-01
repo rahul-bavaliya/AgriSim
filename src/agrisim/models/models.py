@@ -10,6 +10,7 @@ from agrisim.core.database import Base
 
 class FieldModel(Base):
     __tablename__ = "fields"
+    __table_args__ = {'extend_existing': True}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -27,10 +28,14 @@ class FieldModel(Base):
     )
 
     weather_telemetry = relationship(
-        "WeatherTelemetryModel", back_populates="field", cascade="all, delete-orphan"
+        "agrisim.models.models.WeatherTelemetryModel", 
+        back_populates="field", 
+        cascade="all, delete-orphan"
     )
     simulations = relationship(
-        "SimulationModel", back_populates="field", cascade="all, delete-orphan"
+        "agrisim.models.models.SimulationModel", 
+        back_populates="field", 
+        cascade="all, delete-orphan"
     )
 
 
@@ -47,11 +52,12 @@ class WeatherTelemetryModel(Base):
     precipitation_mm: Mapped[float] = mapped_column(Float, nullable=False)
     solar_radiation: Mapped[float] = mapped_column(Float, nullable=False)
 
-    field = relationship("FieldModel", back_populates="weather_telemetry")
+    field = relationship("agrisim.models.models.FieldModel", back_populates="weather_telemetry")
 
 
 class SimulationModel(Base):
     __tablename__ = "simulations"
+    __table_args__ = {'extend_existing': True}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -72,4 +78,4 @@ class SimulationModel(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    field = relationship("FieldModel", back_populates="simulations")
+    field = relationship("agrisim.models.models.FieldModel", back_populates="simulations")

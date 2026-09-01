@@ -1,3 +1,4 @@
+from agrisim.api.v1.endpoints import weather
 from fastapi import FastAPI
 from agrisim.api.v1.endpoints import (
     fields,
@@ -13,7 +14,7 @@ app = FastAPI(title="AgriSim API", version="1.0.0")
 
 # Include the fields router
 app.include_router(fields.router, prefix="/api/v1")
-
+app.include_router(weather.router, prefix="/api/v1")
 
 @app.get("/")
 def root():

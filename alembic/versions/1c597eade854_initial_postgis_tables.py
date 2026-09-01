@@ -1,8 +1,8 @@
-"""Add weather telemetry table
+"""Initial PostGIS tables
 
-Revision ID: f82330c3ea37
-Revises: b85d2d9a32fc
-Create Date: 2026-08-31 22:57:40.843917
+Revision ID: 1c597eade854
+Revises: 
+Create Date: 2026-08-31 22:38:19.665131
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f82330c3ea37'
-down_revision: Union[str, Sequence[str], None] = 'b85d2d9a32fc'
+revision: str = '1c597eade854'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
