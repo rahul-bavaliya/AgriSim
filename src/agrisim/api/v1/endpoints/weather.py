@@ -1,5 +1,6 @@
-from typing import List
 import uuid
+from typing import List
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/weather", tags=["weather"])
     status_code=status.HTTP_201_CREATED,
 )
 def create_weather_record(weather_in: WeatherCreate, db: Session = Depends(get_db)):
-    """Log a new weather record for a specific agricultural field."""
+    """Log a new weather record (typically used by background ingestion tasks or admins)."""
     weather = WeatherService.create_weather_record(db=db, weather_in=weather_in)
     return ResponseEnvelope(
         status="success",
@@ -27,9 +28,16 @@ def create_weather_record(weather_in: WeatherCreate, db: Session = Depends(get_d
     )
 
 
-@router.get("/field/{field_id}", response_model=ResponseEnvelope[List[WeatherResponse]])
+@router.get(
+    "/field/{field_id}",
+    response_model=ResponseEnvelope[List[WeatherResponse]],
+    status_code=status.HTTP_200_OK,
+)
 def get_weather_by_field(
-    field_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+    field_id: uuid.UUID,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
 ):
     """Retrieve historical weather records for a specific agricultural field."""
     weather_records = WeatherService.get_weather_by_field(
