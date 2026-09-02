@@ -4,7 +4,7 @@ from shapely.geometry import shape
 from geoalchemy2.shape import from_shape
 from agrisim.models import FieldModel
 from agrisim.schemas.field import FieldCreate
-
+from agrisim.services import soil
 
 def create_field(db: Session, field_in: FieldCreate, owner_id: uuid.UUID) -> FieldModel:
     geom = shape(field_in.boundary)
@@ -20,6 +20,11 @@ def create_field(db: Session, field_in: FieldCreate, owner_id: uuid.UUID) -> Fie
     db.add(db_field)
     db.commit()
     db.refresh(db_field)
+
+    # Automatically create the matching soil state entry
+    soil.SoilSimulationService.initialize_for_field(db=db, field_id=db_field.id)
+
+
     return db_field
 
 

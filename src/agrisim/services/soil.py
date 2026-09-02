@@ -5,14 +5,10 @@ from agrisim.models.soil import SoilStateModel
 
 class SoilSimulationService:
     @staticmethod
-    def update_field_soil_moisture(
-        db: Session, field_id: UUID, precipitation_mm: float, temperature_celsius: float
-    ) -> SoilStateModel:
+    def initialize_for_field(db: Session, field_id: UUID) -> SoilStateModel:
         """
-        Fetches the current soil state for a field, calculates the new water balance,
-        and saves the updated state to the database.
+        Initializes a baseline soil state for a newly created field if it doesn't already exist.
         """
-        # 1. Get existing soil state or initialize a default one if none exists yet
         soil_state = (
             db.query(SoilStateModel).filter(SoilStateModel.field_id == field_id).first()
         )
@@ -27,6 +23,19 @@ class SoilSimulationService:
             db.add(soil_state)
             db.commit()
             db.refresh(soil_state)
+
+        return soil_state
+
+    @staticmethod
+    def update_field_soil_moisture(
+        db: Session, field_id: UUID, precipitation_mm: float, temperature_celsius: float
+    ) -> SoilStateModel:
+        """
+        Fetches the current soil state for a field, calculates the new water balance,
+        and saves the updated state to the database.
+        """
+        # 1. Get existing soil state or initialize a default one if none exists yet
+        soil_state = SoilSimulationService.initialize_for_field(db, field_id)
 
         # 2. Estimate daily evapotranspiration (ET) based on temperature
         estimated_et = (
