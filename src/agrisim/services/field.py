@@ -4,7 +4,7 @@ from shapely.geometry import shape
 from geoalchemy2.shape import from_shape
 from agrisim.models import FieldModel
 from agrisim.schemas.field import FieldCreate
-from agrisim.services import soil
+
 
 def create_field(db: Session, field_in: FieldCreate, owner_id: uuid.UUID) -> FieldModel:
     geom = shape(field_in.boundary)
@@ -20,10 +20,6 @@ def create_field(db: Session, field_in: FieldCreate, owner_id: uuid.UUID) -> Fie
     db.add(db_field)
     db.commit()
     db.refresh(db_field)
-
-    # Automatically create the matching soil state entry
-    soil.SoilSimulationService.initialize_for_field(db=db, field_id=db_field.id)
-
 
     return db_field
 
@@ -44,11 +40,12 @@ def delete_field(db: Session, field_id: uuid.UUID) -> bool:
     db.commit()
     return True
 
+
 def update_field(db: Session, field_id: uuid.UUID, field_in: dict) -> FieldModel | None:
     db_field = get_field_by_id(db, field_id)
     if not db_field:
         return None
-    
+
     # If boundary is being updated, convert it to a WKBElement
     if "boundary" in field_in and field_in["boundary"] is not None:
         geom = shape(field_in["boundary"])
@@ -56,12 +53,15 @@ def update_field(db: Session, field_id: uuid.UUID, field_in: dict) -> FieldModel
 
     for key, value in field_in.items():
         setattr(db_field, key, value)
-        
+
     db.commit()
     db.refresh(db_field)
     return db_field
 
-def get_fields_by_owner(db: Session, owner_id: uuid.UUID, skip: int = 0, limit: int = 100):
+
+def get_fields_by_owner(
+    db: Session, owner_id: uuid.UUID, skip: int = 0, limit: int = 100
+):
     return (
         db.query(FieldModel)
         .filter(FieldModel.owner_id == owner_id)

@@ -8,7 +8,6 @@ from agrisim.core.database import get_db
 from agrisim.schemas.field import FieldCreate, FieldResponse, FieldUpdate
 from agrisim.schemas.envelope import ResponseEnvelope
 from agrisim.services import field as field_service
-from agrisim.models.soil import SoilStateModel
 from agrisim.models.user import UserModel
 from agrisim.services.deps import get_current_user
 
@@ -105,27 +104,3 @@ def update_field(
         message="Field updated successfully",
         data=updated_field,
     )
-
-
-@router.get("/{field_id}/soil-state")
-def get_soil_state(
-    field_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
-    if not db_field or db_field.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Field not found")
-
-    soil = db.query(SoilStateModel).filter(SoilStateModel.field_id == field_id).first()
-    if not soil:
-        raise HTTPException(
-            status_code=404, detail="Soil state not found for this field."
-        )
-    return {
-        "field_id": soil.field_id,
-        "soil_moisture_mm": soil.soil_moisture_mm,
-        "field_capacity_mm": soil.field_capacity_mm,
-        "wilting_point_mm": soil.wilting_point_mm,
-        "calculated_at": soil.calculated_at,
-    }
