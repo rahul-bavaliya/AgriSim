@@ -1,6 +1,7 @@
 services:
   db:
     image: postgis/postgis:latest
+    platform: linux/amd64
     container_name: agrisim_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -40,7 +41,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
-      - /app/.venv    # <--- Prevents host/.venv from overriding container's .venv
+      - /app/.venv # <--- Prevents host/.venv from overriding container's .venv
     ports:
       - "8000:8000"
     depends_on:
@@ -62,7 +63,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
-      - /app/.venv    # <--- Prevents host/.venv from overriding container's .venv
+      - /app/.venv # <--- Prevents host/.venv from overriding container's .venv
     depends_on:
       db:
         condition: service_healthy
