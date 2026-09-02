@@ -6,13 +6,13 @@ from agrisim.models import FieldModel
 from agrisim.schemas.field import FieldCreate
 
 
-def create_field(db: Session, field_in: FieldCreate) -> FieldModel:
+def create_field(db: Session, field_in: FieldCreate, owner_id: uuid.UUID) -> FieldModel:
     geom = shape(field_in.boundary)
     wkb_element = from_shape(geom, srid=4326)
 
     db_field = FieldModel(
         name=field_in.name,
-        owner_id=field_in.owner_id,
+        owner_id=owner_id,
         total_acres=field_in.total_acres,
         boundary=wkb_element,
     )
@@ -55,3 +55,12 @@ def update_field(db: Session, field_id: uuid.UUID, field_in: dict) -> FieldModel
     db.commit()
     db.refresh(db_field)
     return db_field
+
+def get_fields_by_owner(db: Session, owner_id: uuid.UUID, skip: int = 0, limit: int = 100):
+    return (
+        db.query(FieldModel)
+        .filter(FieldModel.owner_id == owner_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )

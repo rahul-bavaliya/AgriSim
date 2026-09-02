@@ -1,3 +1,4 @@
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import APIRouter, Depends, HTTPException, status, Security
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr
@@ -49,11 +50,22 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
     return {"message": "User registered successfully", "email": new_user.email}
 
 
+# Remove UserLogin class if it's no longer needed, or keep it. 
+# OAuth2PasswordRequestForm automatically parses form data with 'username' and 'password'.
+
 @router.post("/login")
-def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(UserModel).filter(UserModel.email == user_in.email).first()
-    if not user or not verify_password(user_in.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
+    # Note: Swagger UI puts the user's email into the 'username' form field
+    user = db.query(UserModel).filter(UserModel.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
