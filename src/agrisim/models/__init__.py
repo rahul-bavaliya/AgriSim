@@ -1,7 +1,0 @@
-# src/agrisim/models/__init__.py
-
-from agrisim.models.weather import WeatherModel
-from agrisim.models.fieldmodel import FieldModel
-
-# When you add a field model later, you'll just add it here:
-# from agrisim.models.field import FieldModel
