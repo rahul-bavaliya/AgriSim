@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
+from agrisim.services.nasa_service import fetch_nasa_seasonal_data
 from agrisim.core.database import get_db
 from agrisim.schemas.field import FieldCreate, FieldResponse, FieldUpdate
 from agrisim.schemas.envelope import ResponseEnvelope
@@ -103,4 +103,53 @@ def update_field(
         code=200,
         message="Field updated successfully",
         data=updated_field,
+    )
+
+
+from shapely.geometry import shape
+
+
+from geoalchemy2.shape import to_shape
+
+
+@router.get("/{field_id}/analyze")
+async def analyze_field_season(
+    field_id: uuid.UUID,
+    season_start: str,
+    season_end: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    # 1. Fetch the field and check ownership
+    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
+    if not db_field or db_field.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Field not found")
+
+    # 2. Convert GeoAlchemy2 WKBElement boundary to Shapely geometry & get centroid
+    geom_shape = to_shape(db_field.boundary)
+    centroid = geom_shape.centroid
+    lat, lon = centroid.y, centroid.x
+
+    # 3. Call NASA service (Note: For future dates like 2027, ensure your NASA
+    # service maps these to historical equivalent dates so metrics aren't empty)
+    # Inside your analyze endpoint:
+    raw_nasa_data = await fetch_nasa_seasonal_data(lat, lon, season_start, season_end)
+
+    # 1. Aggregate raw metrics
+    aggregated_metrics = aggregate_nasa_metrics(raw_nasa_data["nasa_metrics"])
+
+    # 2. Run crop simulation using those aggregated metrics
+    simulation_results = run_simple_crop_model(aggregated_metrics, crop_type="wheat")
+
+    # 3. Return both together in your response envelope
+    return ResponseEnvelope(
+        status="success",
+        code=200,
+        message="Field seasonal analysis and crop simulation retrieved successfully",
+        data={
+            "field_id": field_id,
+            "coordinates": {"lat": lat, "lon": lon},
+            "weather_summary": aggregated_metrics,
+            "simulation": simulation_results
+        }
     )

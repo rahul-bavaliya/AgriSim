@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from geoalchemy2 import Geometry
 from agrisim.core.database import Base
 
+
 class FieldModel(Base):
     __tablename__ = "fields"
 
@@ -13,7 +14,7 @@ class FieldModel(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    
+
     # Linked to user ID via foreign key
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -30,6 +31,3 @@ class FieldModel(Base):
 
     # Relationships
     owner = relationship("UserModel", back_populates="fields")
-    weather_records = relationship(
-        "WeatherModel", back_populates="field", cascade="all, delete-orphan"
-    )

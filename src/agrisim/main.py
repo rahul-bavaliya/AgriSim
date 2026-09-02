@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
-from agrisim.api.v1.endpoints import auth, fields
+from agrisim.api.v1.endpoints import auth, fields, recommendations
 from agrisim.schemas.envelope import ResponseEnvelope
 from agrisim.core.logging import setup_logging
 
@@ -70,6 +70,6 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 # --- Register Routers ---
 app.include_router(fields.router, prefix="/api/v1")
-
+app.include_router(recommendations.router, prefix="/api/v1")
 
 app.include_router(auth.router, prefix="/api/v1")
