@@ -1,3 +1,5 @@
+import importlib
+import pkgutil
 import sys
 from os.path import abspath, dirname
 
@@ -10,11 +12,15 @@ from alembic import context
 
 from agrisim.core.config import settings
 from agrisim.core.database import Base
-from agrisim.models import FieldModel, WeatherTelemetryModel, SimulationModel
+from agrisim import models
 
 from geoalchemy2 import alembic_helpers
-from typing import Optional
+from typing import Callable, Optional, cast, Union, Literal, Any
 from sqlalchemy.sql.schema import SchemaItem
+from geoalchemy2.types import Geometry
+
+for _, module_name, _ in pkgutil.walk_packages(models.__path__, models.__name__ + "."):
+    importlib.import_module(module_name)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
@@ -77,7 +83,8 @@ def custom_include_object(
     if type_ == "table" and name in POSTGIS_SYSTEM_TABLES:
         return False
     # 2. Defer to GeoAlchemy2's helper logic for everything else
-    return alembic_helpers.include_object(object, name, type_, reflected, compare_to)
+    include_object: Callable[[SchemaItem, Optional[str], str, bool, Optional[SchemaItem]], bool] = alembic_helpers.include_object  # type: ignore[assignment]
+    return include_object(object, name, type_, reflected, compare_to)
 
 
 def run_migrations_offline() -> None:

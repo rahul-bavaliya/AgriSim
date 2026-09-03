@@ -1,33 +1,39 @@
-# Use official Python 3.12 slim image
+# Use official lightweight Python 3.12 image
 FROM python:3.12-slim
 
-# Install system dependencies required for PostGIS, compilation, and curl
-RUN apt-get update && apt-get install -y \
+# Install system dependencies required for PostGIS/psycopg2 and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libpq-dev \
-    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv tool
+# Install uv for ultra-fast package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set working directory
+# Set working directory inside the container
 WORKDIR /app
 
-# Enable bytecode compilation
+# Enable bytecode compilation and copy dependency files first for optimal caching
 ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
-# Copy dependency management files first to leverage Docker cache
-COPY pyproject.toml uv.lock ./
+# Copy dependency configuration files, packaging readme, and source structure
+COPY pyproject.toml uv.lock README.md* ./
+COPY src/ ./src/
 
-# Install project dependencies without the virtual environment (since container is isolated)
-RUN uv sync --frozen --no-dev --no-install-project
-
-# Copy the rest of the application code
-COPY . .
-
-# Install the project itself
+# Install project dependencies using uv (standard virtual environment build)
 RUN uv sync --frozen --no-dev
 
-# Expose FastAPI default port
+# Copy the rest of the application source code (tests, scripts, etc.)
+COPY . .
+
+# Set Python path to include the src directory and virtual environment binaries
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app/src
+
+# Expose FastAPI application port
 EXPOSE 8000
+
+# Default command (overridden by docker-compose for celery workers)
+CMD ["uv", "run", "uvicorn", "agrisim.main:app", "--host", "0.0.0.0", "--port", "8000"]
