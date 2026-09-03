@@ -1,6 +1,6 @@
 # src/agrisim/schemas/field.py
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field as PydanticField, field_validator
 from shapely.geometry import shape, mapping
@@ -50,8 +50,8 @@ class FieldCreate(FieldBase):
         if isinstance(v, dict):
             try:
                 # Just validate that shapely can read it, but return the dict
-                shape(v)
-                return v
+                shape(cast(Any, v))
+                return cast(Any, v)
             except Exception as e:
                 raise ValueError(f"Invalid GeoJSON boundary format: {e}")
         return v
@@ -87,8 +87,8 @@ class FieldUpdate(BaseModel):
             return None
         if isinstance(v, dict):
             try:
-                shape(v)
-                return v
+                shape(cast(Any, v))
+                return cast(Any, v)
             except Exception as e:
                 raise ValueError(f"Invalid GeoJSON boundary format: {e}")
         return v
