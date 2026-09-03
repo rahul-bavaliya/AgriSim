@@ -1,15 +1,14 @@
-import uuid
+# src/agrisim/api/v1/endpoints/fields.py
+from typing import Any, List
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from uuid import UUID
-from agrisim.services.nasa_service import fetch_nasa_seasonal_data
+
 from agrisim.core.database import get_db
-from agrisim.schemas.field import FieldCreate, FieldResponse, FieldUpdate
-from agrisim.schemas.envelope import ResponseEnvelope
-from agrisim.services import field as field_service
-from agrisim.models.user import UserModel
-from agrisim.services.deps import get_current_user
+from agrisim.schemas.field import FieldCreate, FieldUpdate, FieldResponse
+from agrisim.schemas.response_envelope import ResponseEnvelope
+from agrisim.services.field_service import FieldService
 
 router = APIRouter(prefix="/fields", tags=["Fields"])
 
@@ -20,136 +19,111 @@ router = APIRouter(prefix="/fields", tags=["Fields"])
     status_code=status.HTTP_201_CREATED,
 )
 def create_field(
-    field_in: FieldCreate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    # Pass current_user.id to service layer so the field belongs to the authenticated user
-    db_field = field_service.create_field(
-        db=db, field_in=field_in, owner_id=current_user.id
-    )
-    return ResponseEnvelope(
-        status="success", code=201, message="Field created successfully", data=db_field
-    )
+    payload: FieldCreate, db: Session = Depends(get_db)
+) -> ResponseEnvelope[FieldResponse]:
+    try:
+        new_field = FieldService.create_field(db, payload)
+        field_res = FieldResponse.model_validate(new_field)
+        return ResponseEnvelope(
+            status="success",
+            code=201,
+            message="Field created successfully",
+            data=field_res,
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create field: {str(e)}",
+        )
 
 
 @router.get("/", response_model=ResponseEnvelope[List[FieldResponse]])
-def read_fields(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    # Restrict field listing to the logged-in user
-    fields = field_service.get_fields_by_owner(
-        db=db, owner_id=current_user.id, skip=skip, limit=limit
-    )
+def list_fields(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+) -> ResponseEnvelope[List[FieldResponse]]:
+    fields = FieldService.get_fields(db, skip=skip, limit=limit)
+    field_list = [FieldResponse.model_validate(f) for f in fields]
+
     return ResponseEnvelope(
-        status="success", code=200, message="Fields retrieved successfully", data=fields
+        status="success",
+        code=200,
+        message="Fields retrieved successfully",
+        data=field_list,
     )
 
 
 @router.get("/{field_id}", response_model=ResponseEnvelope[FieldResponse])
-def read_field(
-    field_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
-    if not db_field or db_field.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Field not found")
+def get_field(
+    field_id: UUID, db: Session = Depends(get_db)
+) -> ResponseEnvelope[FieldResponse]:
+    field = FieldService.get_field_by_id(db, field_id)
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Field not found"
+        )
+
     return ResponseEnvelope(
         status="success",
         code=200,
         message="Field retrieved successfully",
-        data=db_field,
-    )
-
-
-@router.delete(
-    "/{field_id}", response_model=ResponseEnvelope[None], status_code=status.HTTP_200_OK
-)
-def remove_field(
-    field_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-) -> ResponseEnvelope[None]:
-    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
-    if not db_field or db_field.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Field not found")
-
-    success = field_service.delete_field(db=db, field_id=field_id)
-    return ResponseEnvelope(
-        status="success", code=200, message="Field deleted successfully", data=None
+        data=FieldResponse.model_validate(field),
     )
 
 
 @router.put("/{field_id}", response_model=ResponseEnvelope[FieldResponse])
 def update_field(
-    field_id: uuid.UUID,
-    field_in: FieldUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    field_id: UUID, payload: FieldUpdate, db: Session = Depends(get_db)
 ) -> ResponseEnvelope[FieldResponse]:
-    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
-    if not db_field or db_field.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Field not found")
+    field = FieldService.get_field_by_id(db, field_id)
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Field not found"
+        )
 
-    updated_field = field_service.update_field(
-        db=db, field_id=field_id, field_in=field_in.model_dump(exclude_unset=True)
-    )
+    updated_field = FieldService.update_field(db, field, payload)
     return ResponseEnvelope(
         status="success",
         code=200,
         message="Field updated successfully",
-        data=updated_field,
+        data=FieldResponse.model_validate(updated_field),
     )
 
 
-from shapely.geometry import shape
+@router.delete("/{field_id}", response_model=ResponseEnvelope[dict[str, Any]])
+def delete_field(
+    field_id: UUID, db: Session = Depends(get_db)
+) -> ResponseEnvelope[dict[str, Any]]:
+    field = FieldService.get_field_by_id(db, field_id)
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Field not found"
+        )
 
-
-from geoalchemy2.shape import to_shape
-
-
-@router.get("/{field_id}/analyze")
-async def analyze_field_season(
-    field_id: uuid.UUID,
-    season_start: str,
-    season_end: str,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    # 1. Fetch the field and check ownership
-    db_field = field_service.get_field_by_id(db=db, field_id=field_id)
-    if not db_field or db_field.owner_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Field not found")
-
-    # 2. Convert GeoAlchemy2 WKBElement boundary to Shapely geometry & get centroid
-    geom_shape = to_shape(db_field.boundary)
-    centroid = geom_shape.centroid
-    lat, lon = centroid.y, centroid.x
-
-    # 3. Call NASA service (Note: For future dates like 2027, ensure your NASA
-    # service maps these to historical equivalent dates so metrics aren't empty)
-    # Inside your analyze endpoint:
-    raw_nasa_data = await fetch_nasa_seasonal_data(lat, lon, season_start, season_end)
-
-    # 1. Aggregate raw metrics
-    aggregated_metrics = aggregate_nasa_metrics(raw_nasa_data["nasa_metrics"])
-
-    # 2. Run crop simulation using those aggregated metrics
-    simulation_results = run_simple_crop_model(aggregated_metrics, crop_type="wheat")
-
-    # 3. Return both together in your response envelope
+    FieldService.delete_field(db, field)
     return ResponseEnvelope(
         status="success",
         code=200,
-        message="Field seasonal analysis and crop simulation retrieved successfully",
-        data={
-            "field_id": field_id,
-            "coordinates": {"lat": lat, "lon": lon},
-            "weather_summary": aggregated_metrics,
-            "simulation": simulation_results
-        }
+        message="Field deleted successfully",
+        data={"id": str(field_id)},
+    )
+
+
+@router.get("/search/point", response_model=ResponseEnvelope[FieldResponse])
+def get_field_by_point(
+    lat: float, lon: float, db: Session = Depends(get_db)
+) -> ResponseEnvelope[FieldResponse]:
+    """Finds the agricultural field containing the specified latitude and longitude."""
+    field = FieldService.get_field_by_point(db, lat=lat, lon=lon)
+    if not field:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No field found containing the specified coordinates",
+        )
+
+    return ResponseEnvelope(
+        status="success",
+        code=200,
+        message="Field found successfully",
+        data=FieldResponse.model_validate(field),
     )

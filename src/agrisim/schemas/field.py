@@ -1,71 +1,111 @@
-import uuid
-from typing import Any, Dict, Optional
+# src/agrisim/schemas/field.py
+from datetime import datetime
+from typing import Any, Optional
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field as PydanticField, field_validator
+from shapely.geometry import shape, mapping
+from geoalchemy2.elements import WKBElement
 from geoalchemy2.shape import to_shape
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from shapely.geometry import mapping
 
 
-class FieldCreate(BaseModel):
-    name: str = Field(..., examples=["North Valley Farm"])
-    # owner_id: uuid.UUID = Field(..., examples=["123e4567-e89b-12d3-a456-426614174000"])
-    total_acres: float = Field(..., examples=[150.5])
-    boundary: Dict[str, Any] = Field(
+class FieldBase(BaseModel):
+    name: str = PydanticField(
         ...,
+        min_length=1,
+        max_length=255,
+        description="Name of the field",
+        examples=["North Valley Pasture"],
+    )
+    total_acres: Optional[float] = PydanticField(
+        None,
+        gt=0,
+        description="Total acreage of the field (auto-calculated if omitted)",
+        examples=[125.5],
+    )
+    boundary: Any = PydanticField(
+        ...,
+        description="Polygon boundary coordinates or GeoJSON dictionary",
         examples=[
             {
                 "type": "Polygon",
                 "coordinates": [
                     [
-                        [-93.63, 42.02],
-                        [-93.62, 42.02],
-                        [-93.62, 42.01],
-                        [-93.63, 42.01],
-                        [-93.63, 42.02],
+                        [50.462480, -104.480302],
+                        [50.462507, -104.469316],
+                        [50.455384, -104.469268],
+                        [50.455442, -104.480193],
+                        [50.462480, -104.480302],
                     ]
                 ],
             }
         ],
     )
+
+
+class FieldCreate(FieldBase):
+    @field_validator("boundary", mode="before")
+    @classmethod
+    def validate_boundary_input(cls, v: Any) -> Any:
+        """Ensure incoming GeoJSON dict is valid."""
+        if isinstance(v, dict):
+            try:
+                # Just validate that shapely can read it, but return the dict
+                shape(v)
+                return v
+            except Exception as e:
+                raise ValueError(f"Invalid GeoJSON boundary format: {e}")
+        return v
 
 
 class FieldUpdate(BaseModel):
-    name: Optional[str] = Field(None, examples=["South Valley Farm"])
-    total_acres: Optional[float] = Field(None, examples=[125.0])
-    boundary: Optional[Dict[str, Any]] = Field(
-        None,
+    name: Optional[str] = PydanticField(None, min_length=1, max_length=255)
+    total_acres: Optional[float] = PydanticField(None, gt=0)
+    boundary: Optional[Any] = PydanticField(
+        None,  # <-- Change this from ... to None
+        description="Polygon boundary coordinates or GeoJSON dictionary",
         examples=[
             {
                 "type": "Polygon",
                 "coordinates": [
                     [
-                        [-93.2, 44.9],
-                        [-93.1, 44.9],
-                        [-93.1, 44.8],
-                        [-93.2, 44.8],
-                        [-93.2, 44.9],
+                        [50.462480, -104.480302],
+                        [50.462507, -104.469316],
+                        [50.455384, -104.469268],
+                        [50.455442, -104.480193],
+                        [50.462480, -104.480302],
                     ]
                 ],
             }
         ],
     )
 
+    @field_validator("boundary", mode="before")
+    @classmethod
+    def validate_boundary_input(cls, v: Any) -> Any:
+        # If boundary is None (not provided in update), skip validation
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            try:
+                shape(v)
+                return v
+            except Exception as e:
+                raise ValueError(f"Invalid GeoJSON boundary format: {e}")
+        return v
 
-class FieldResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    owner_id: uuid.UUID
-    total_acres: float
-    boundary: Dict[str, Any]
 
-    model_config = ConfigDict(from_attributes=True)
+class FieldResponse(FieldBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None  # Make it optional with a default of None
+
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
     @field_validator("boundary", mode="before")
     @classmethod
-    def assemble_boundary(cls, v: Any) -> Any:
-        if isinstance(v, dict):
-            return v
-        try:
-            shape = to_shape(v)
-            return mapping(shape)
-        except Exception:
-            return v
+    def parse_boundary(cls, v: Any) -> Any:
+        """Convert database WKBElement object back into a standard GeoJSON dictionary."""
+        if isinstance(v, WKBElement):
+            polygon = to_shape(v)
+            return mapping(polygon)
+        return v
