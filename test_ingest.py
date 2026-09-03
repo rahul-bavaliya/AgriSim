@@ -1,7 +1,7 @@
 import uuid
 
 from agrisim.core.database import SessionLocal
-from agrisim.models.fieldmodel import FieldModel
+from agrisim.models.field import FieldModel
 from agrisim.tasks.weather_tasks import fetch_field_weather
 
 

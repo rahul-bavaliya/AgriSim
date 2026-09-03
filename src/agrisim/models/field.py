@@ -7,7 +7,7 @@ from geoalchemy2 import Geometry
 from agrisim.core.database import Base
 
 
-class FieldModel(Base):
+class Field(Base):
     __tablename__ = "fields"
 
     id: Mapped[uuid.UUID] = mapped_column(
